@@ -99,11 +99,24 @@ Sau đó vào **Settings &rarr; Pages &rarr; chọn branch main** như bước 5
    - 🟢 **Hình vuông lục (D)**
 4. Bấm thật nhanh đáp án bạn cho là đúng để nhận tối đa điểm thưởng tốc độ!
 
-### Mẹo Thử Nghiệm Trên 1 Máy Tính:
-Bạn có thể mở **2 tab trình duyệt cùng lúc** trên máy tính:
-- Tab 1: Nhấn *Tạo Phòng Mới* (làm Host).
-- Tab 2: Mở một cửa sổ ẩn danh (Incognito) hoặc tab mới, nhấn *Tham Gia Phòng* và nhập mã phòng của Tab 1.
-- Bạn sẽ thấy hai tab đồng bộ tức thì với nhau theo thời gian thực!
+### Mẹo Thử Nghiệm Ngay Lập Tức:
+
+#### Cách 1: Thử nghiệm giữa 2 Tab trên cùng máy tính
+- Tab 1: Nhấn *Tạo Phòng Mới* (làm Quản Trò MC).
+- Tab 2: Mở một cửa sổ ẩn danh (Incognito) hoặc tab mới, nhấn *Vào Phòng Thi Đấu* và nhập mã phòng PIN của Tab 1.
+- Bạn sẽ thấy hai tab kết nối và đồng bộ ngay lập tức!
+
+#### Cách 2: Thử nghiệm giữa Điện Thoại và Máy Tính qua mạng Wi-Fi (Không cần chờ GitHub)
+1. Trên máy tính, mở terminal tại thư mục dự án và chạy:
+   ```bash
+   python -m http.server 8080 --bind 0.0.0.0
+   ```
+2. Trên máy tính mở: `http://localhost:8080` rồi bấm **Tạo Phòng Mới**.
+3. Tại ô *"Đang mở file cục bộ"* dưới mã QR trên máy tính, nhập IP mạng Wi-Fi của bạn: `http://192.168.1.5:8080` và bấm **Đổi QR**.
+4. Dùng điện thoại (kết nối cùng Wi-Fi) quét mã QR hoặc mở trình duyệt điện thoại gõ `http://192.168.1.5:8080` &rarr; Nhập mã PIN và bấm **Tham Gia Ngay**!
+
+#### Cách 3: Đưa lên GitHub Pages (Chơi Toàn Cầu Bằng 4G/5G/Wi-Fi)
+- Xem hướng dẫn chi tiết ở mục **Hướng Dẫn Đưa Lên GitHub Pages** bên trên. Chỉ cần kéo thả file `index.html` lên GitHub là ai cũng có thể chơi từ bất kỳ đâu!
 
 ---
 

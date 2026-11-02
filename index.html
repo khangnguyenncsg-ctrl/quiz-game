@@ -336,12 +336,18 @@
                             </span>
                         </div>
 
-                        <!-- Local file warning hint if opened via file:// -->
-                        <div id="host-qr-local-hint" class="hidden p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-center leading-relaxed">
-                            <div class="font-bold flex items-center justify-center gap-1.5 mb-1 text-amber-200">
-                                <i class="ph-bold ph-info text-base"></i> Đang mở file cục bộ (file://)
+                        <!-- Local file warning hint or Custom Join URL for local Wi-Fi / GitHub Pages -->
+                        <div id="host-qr-local-hint" class="hidden p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-left leading-relaxed space-y-2">
+                            <div class="font-bold flex items-center gap-1.5 text-amber-200">
+                                <i class="ph-bold ph-info text-base"></i> Đang mở qua file:// (Cục bộ)
                             </div>
-                            Để điện thoại quét QR kết nối được, hãy đưa web lên <strong>GitHub Pages</strong> (hoặc mở bằng IP mạng LAN Wi-Fi)!
+                            <p class="text-[11px] text-slate-300">
+                                Để điện thoại quét QR kết nối được: hãy đưa lên <strong>GitHub Pages</strong>, hoặc nếu cùng mạng Wi-Fi hãy nhập IP máy tính:
+                            </p>
+                            <div class="flex gap-1.5">
+                                <input id="input-custom-qr-url" type="text" placeholder="http://192.168.1.X:8080" class="px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-white/20 text-white flex-1 font-mono" />
+                                <button onclick="window.updateCustomQRUrl()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs whitespace-nowrap">Đổi QR</button>
+                            </div>
                         </div>
 
                         <!-- Game Settings (Pack, Timer, Bots) -->
@@ -426,14 +432,14 @@
                     <p class="text-slate-400 text-xs sm:text-sm mt-1">Đã vào phòng thi đấu: <strong class="text-indigo-400 font-display text-base" id="player-joined-room-code">------</strong></p>
                 </div>
 
-                <!-- Animated waiting box -->
-                <div class="p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 text-emerald-300 space-y-2">
-                    <div class="flex items-center justify-center gap-2 font-display font-bold text-base sm:text-lg">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-                        <span>Đã Kết Nối Đồng Bộ Thời Gian Thực!</span>
+                <!-- Animated waiting box with live connection states -->
+                <div id="player-waiting-box" class="p-5 rounded-2xl bg-slate-900/80 border border-amber-500/30 text-amber-300 space-y-2 transition-all duration-300">
+                    <div id="player-waiting-status" class="flex items-center justify-center gap-2 font-display font-bold text-base sm:text-lg">
+                        <span id="player-waiting-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span id="player-waiting-status-text">Đang Tìm & Kết Nối Quản Trò...</span>
                     </div>
-                    <p class="text-xs text-slate-300">
-                        Vui lòng nhìn lên màn hình chính của MC hoặc đợi MC nhấn bắt đầu. Màn hình của bạn sẽ đếm ngược và hiển thị câu hỏi đồng thời!
+                    <p id="player-waiting-desc" class="text-xs text-slate-300 leading-relaxed">
+                        Đang đồng bộ qua Cloud Relay và đăng ký vào phòng... Hãy đảm bảo Quản Trò đã mở phòng!
                     </p>
                 </div>
 
@@ -1014,8 +1020,8 @@
                 </div>
 
                 <div>
-                    <label class="block text-slate-300 font-semibold mb-1">Mã phòng tùy chọn (để trống sẽ tạo ngẫu nhiên):</label>
-                    <input id="input-custom-pin" type="text" maxlength="10" placeholder="VD: 8888, ARENA1, LOP12A..." class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/20 text-indigo-300 font-display font-bold uppercase focus:outline-none focus:border-indigo-500">
+                    <label class="block text-slate-300 font-semibold mb-1">Mã phòng tùy chọn (để trống sẽ tạo 6 số ngẫu nhiên):</label>
+                    <input id="input-custom-pin" type="text" maxlength="12" placeholder="VD: 839201 hoặc LOP12A..." class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/20 text-indigo-300 font-display font-bold uppercase focus:outline-none focus:border-indigo-500">
                 </div>
 
                 <div>
@@ -1063,7 +1069,7 @@
 
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">3. Mã phòng thi (PIN):</label>
-                    <input id="input-join-pin" type="text" maxlength="12" placeholder="Nhập mã phòng (VD: ARENA-88)" class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/20 text-purple-300 font-display font-bold uppercase focus:outline-none focus:border-purple-500">
+                    <input id="input-join-pin" type="text" inputmode="text" maxlength="12" placeholder="Nhập mã phòng (VD: 839201)" class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/20 text-purple-300 font-display font-bold uppercase focus:outline-none focus:border-purple-500">
                 </div>
             </div>
 
@@ -1340,20 +1346,37 @@
         const processedMsgIds = new Set();
 
         // ============================================================================
-        // 4. MẠNG ĐỒNG BỘ THỜI GIAN THỰC (MQTT OVER WSS + BROADCAST CHANNEL)
+        // 4. MẠNG ĐỒNG BỘ THỜI GIAN THỰC (DUAL-BROKER MQTT WSS + BROADCAST CHANNEL)
         // ============================================================================
+        const CLOUD_BROKERS = [
+            { name: 'HiveMQ Public Cloud', url: 'wss://broker.hivemq.com:8884/mqtt' },
+            { name: 'EMQX Public Cloud', url: 'wss://broker.emqx.io:8084/mqtt' }
+        ];
+        let activeBrokerIdx = 0;
         let mqttClient = null;
         let broadcastChan = null;
         let isConnectedToCloud = false;
+        let hasReceivedHostAck = false;
+        const outboxQueue = [];
+        let brokerConnectTimeout = null;
+        let playerLobbyInterval = null;
+        let hostLobbyInterval = null;
 
-        function initRealtimeNetwork(roomCode) {
-            currentRoomCode = roomCode;
+        function normalizeRoomPin(pin) {
+            if (!pin) return '';
+            return pin.toString().trim().toUpperCase().replace(/[\s\-]+/g, '');
+        }
+
+        function initRealtimeNetwork(roomCode, brokerIdx = 0) {
+            currentRoomCode = normalizeRoomPin(roomCode);
+            activeBrokerIdx = brokerIdx % CLOUD_BROKERS.length;
+            const currentBroker = CLOUD_BROKERS[activeBrokerIdx];
             processedMsgIds.clear();
 
-            // 1. Kênh BroadcastChannel nội bộ (Cực kỳ mạnh mẽ: 0ms latency giữa các tab trên cùng máy)
+            // 1. Kênh BroadcastChannel nội bộ (0ms latency giữa các tab trên cùng máy tính)
             try {
                 if (broadcastChan) broadcastChan.close();
-                broadcastChan = new BroadcastChannel('quizarena_net_' + roomCode);
+                broadcastChan = new BroadcastChannel('quizarena_net_' + currentRoomCode);
                 broadcastChan.onmessage = (event) => {
                     handleIncomingNetworkMessage(event.data, 'broadcast');
                 };
@@ -1365,32 +1388,58 @@
             if (typeof mqtt !== 'undefined') {
                 if (mqttClient) {
                     try { mqttClient.end(true); } catch (e) {}
+                    mqttClient = null;
                 }
 
-                // Public High Performance WebSocket Broker (HiveMQ)
-                const brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
                 const clientId = 'qa_' + Math.random().toString(36).substring(2, 9);
+                updateNetworkStatusUI('connecting', `Đang kết nối ${currentBroker.name}...`);
 
-                updateNetworkStatusUI('connecting', 'Đang kết nối Cloud Relay...');
+                if (brokerConnectTimeout) clearTimeout(brokerConnectTimeout);
+
+                // Tự động chuyển đổi sang broker dự phòng nếu không kết nối được trong 4 giây
+                brokerConnectTimeout = setTimeout(() => {
+                    if (!isConnectedToCloud) {
+                        console.warn(`${currentBroker.name} phản hồi chậm, chuyển sang broker dự phòng...`);
+                        initRealtimeNetwork(currentRoomCode, activeBrokerIdx + 1);
+                    }
+                }, 4000);
 
                 try {
-                    mqttClient = mqtt.connect(brokerUrl, {
+                    mqttClient = mqtt.connect(currentBroker.url, {
                         clientId: clientId,
                         clean: true,
-                        connectTimeout: 5000,
+                        connectTimeout: 4000,
                         reconnectPeriod: 2500,
                         keepalive: 30
                     });
 
                     mqttClient.on('connect', () => {
+                        if (brokerConnectTimeout) clearTimeout(brokerConnectTimeout);
                         isConnectedToCloud = true;
-                        updateNetworkStatusUI('connected', 'Cloud Relay Đã Kết Nối');
+                        updateNetworkStatusUI('connected', `${currentBroker.name} Đã Kết Nối`);
 
-                        // Lắng nghe topic phòng thi
-                        const topic = `quizarena/v5/${roomCode}/#`;
+                        // Đăng ký nhận toàn bộ sự kiện của phòng
+                        const topic = `quizarena/v6/${currentRoomCode}/#`;
                         mqttClient.subscribe(topic, { qos: 1 }, (err) => {
                             if (err) console.error("Lỗi đăng ký topic:", err);
                         });
+
+                        // Xả sạch toàn bộ hàng đợi outbox tích lũy lúc chưa kết nối
+                        while (outboxQueue.length > 0) {
+                            const item = outboxQueue.shift();
+                            try {
+                                mqttClient.publish(item.topic, item.payloadStr, { qos: 1 });
+                            } catch (e) {
+                                console.warn("Lỗi xả outbox:", e);
+                            }
+                        }
+
+                        // Tự động handshake tùy theo vai trò
+                        if (currentRole === 'player') {
+                            sendPlayerJoinPacket();
+                        } else if (currentRole === 'host') {
+                            hostBroadcastPlayerList();
+                        }
                     });
 
                     mqttClient.on('message', (topic, message) => {
@@ -1401,12 +1450,20 @@
                     });
 
                     mqttClient.on('error', (err) => {
-                        console.warn("MQTT Broker gặp sự cố, thử lại:", err);
+                        console.warn(`Lỗi MQTT [${currentBroker.name}]:`, err);
+                        if (!isConnectedToCloud) {
+                            if (brokerConnectTimeout) clearTimeout(brokerConnectTimeout);
+                            setTimeout(() => {
+                                initRealtimeNetwork(currentRoomCode, activeBrokerIdx + 1);
+                            }, 1000);
+                        }
                     });
 
                     mqttClient.on('close', () => {
-                        isConnectedToCloud = false;
-                        updateNetworkStatusUI('offline', 'Chế độ mạng nội bộ');
+                        if (isConnectedToCloud) {
+                            isConnectedToCloud = false;
+                            updateNetworkStatusUI('connecting', 'Mất kết nối Cloud, đang kết nối lại...');
+                        }
                     });
                 } catch (err) {
                     console.warn("Lỗi khởi tạo MQTT:", err);
@@ -1418,6 +1475,7 @@
         }
 
         function sendNetworkMessage(action, payload = {}) {
+            if (!currentRoomCode) return null;
             const msgId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
             const packet = {
                 id: msgId,
@@ -1429,23 +1487,63 @@
                 ...payload
             };
 
-            // Đánh dấu đã gửi bởi chính mình
+            // Đánh dấu đã gửi bởi chính mình để chống echo
             processedMsgIds.add(msgId);
 
-            // Gửi qua BroadcastChannel
+            // 1. BroadcastChannel (0ms cho tab trên cùng máy tính)
             if (broadcastChan) {
                 try { broadcastChan.postMessage(packet); } catch (e) {}
             }
 
-            // Gửi qua MQTT
+            // 2. MQTT Cloud Relay (cho điện thoại và máy tính khác)
+            const topic = `quizarena/v6/${currentRoomCode}/${action}`;
+            const payloadStr = JSON.stringify(packet);
+
             if (mqttClient && isConnectedToCloud) {
                 try {
-                    const topic = `quizarena/v5/${currentRoomCode}/${action}`;
-                    mqttClient.publish(topic, JSON.stringify(packet), { qos: 1 });
-                } catch (e) {}
+                    mqttClient.publish(topic, payloadStr, { qos: 1 });
+                } catch (e) {
+                    console.warn("Lỗi gửi MQTT, chuyển vào outbox:", e);
+                    outboxQueue.push({ topic, payloadStr });
+                }
+            } else {
+                // Đưa vào outbox để gửi ngay khi MQTT kết nối thành công
+                outboxQueue.push({ topic, payloadStr });
+                if (outboxQueue.length > 50) outboxQueue.shift();
             }
 
             return packet;
+        }
+
+        function sendPlayerJoinPacket() {
+            if (currentRole !== 'player' || !currentRoomCode) return;
+            sendNetworkMessage('PLAYER_JOIN', {
+                player: {
+                    id: myProfile.id,
+                    name: myProfile.name,
+                    avatar: myProfile.avatar
+                }
+            });
+        }
+
+        function updatePlayerConnectionStatus(isAcked) {
+            const box = document.getElementById('player-waiting-box');
+            const title = document.getElementById('player-waiting-status-text');
+            const desc = document.getElementById('player-waiting-desc');
+            const dot = document.getElementById('player-waiting-dot');
+            if (!box || !title || !desc) return;
+
+            if (isAcked) {
+                box.className = "p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 text-emerald-300 space-y-2 transition-all duration-300";
+                if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping";
+                title.textContent = "Đã Vào Phòng Thành Công! Sẵn Sàng Thi Đấu";
+                desc.textContent = "Đã kết nối trực tiếp với Quản Trò MC! Hãy giữ màn hình sáng, khi MC bấm bắt đầu, câu hỏi sẽ xuất hiện ngay lập tức.";
+            } else {
+                box.className = "p-5 rounded-2xl bg-slate-900/80 border border-amber-500/30 text-amber-300 space-y-2 transition-all duration-300";
+                if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
+                title.textContent = "Đang Tìm & Kết Nối Quản Trò...";
+                desc.textContent = "Đang gửi tín hiệu đăng ký vào phòng qua Cloud Relay. Hãy đảm bảo Quản Trò đã mở phòng!";
+            }
         }
 
         function handleIncomingNetworkMessage(packet, source) {
@@ -1491,7 +1589,7 @@
         // ============================================================================
         function hostInitRoom(customPin, hostName) {
             currentRole = 'host';
-            const roomCode = (customPin || 'ARENA-' + Math.floor(1000 + Math.random() * 9000)).trim().toUpperCase();
+            const roomCode = normalizeRoomPin(customPin) || String(Math.floor(100000 + Math.random() * 900000));
             currentRoomCode = roomCode;
 
             myProfile.name = hostName || 'Quản Trò MC';
@@ -1510,13 +1608,25 @@
             // Tạo mã QR
             renderQRCode(roomCode);
 
-            // Ẩn nút seed bots trong tab leaderboard nếu là player, bật nếu là host
+            // Bật nút seed bots trong tab leaderboard nếu là host
             document.getElementById('btn-seed-bots-lb').classList.remove('hidden');
 
             // Ẩn tất cả màn hình con của Arena, hiển thị Host Lobby
             window.switchMainTab('arena');
             showArenaScreen('screen-host-lobby');
             updateHostPlayerUI();
+
+            // Nhịp tim phát LOBBY_SYNC định kỳ mỗi 2 giây để mọi điện thoại vào bất kỳ lúc nào cũng nhận được dữ liệu
+            if (hostLobbyInterval) clearInterval(hostLobbyInterval);
+            hostLobbyInterval = setInterval(() => {
+                const hostLobby = document.getElementById('screen-host-lobby');
+                if (hostLobby && !hostLobby.classList.contains('hidden') && currentRole === 'host') {
+                    hostBroadcastPlayerList();
+                } else {
+                    clearInterval(hostLobbyInterval);
+                    hostLobbyInterval = null;
+                }
+            }, 2000);
 
             showToast(`Đã tạo phòng thi đấu ${roomCode}! Sẵn sàng cho thí sinh vào.`, 'success');
             sound.playTone(660, 'sine', 0.15, 0.15);
@@ -1526,7 +1636,20 @@
             const container = document.getElementById('qrcode-container');
             container.innerHTML = '';
             const isLocal = (window.location.protocol === 'file:');
-            const joinUrl = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+
+            let joinUrl = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+            const customInput = document.getElementById('input-custom-qr-url');
+            if (isLocal) {
+                if (customInput && customInput.value.trim()) {
+                    let customVal = customInput.value.trim();
+                    if (!customVal.includes('?room=')) {
+                        customVal += (customVal.includes('?') ? '&' : '?') + 'room=' + roomCode;
+                    }
+                    joinUrl = customVal;
+                } else {
+                    joinUrl = `https://github.io/gamevui/?room=${roomCode}`;
+                }
+            }
 
             try {
                 new QRCode(container, {
@@ -1538,7 +1661,7 @@
                     correctLevel: QRCode.CorrectLevel.M
                 });
             } catch (e) {
-                container.innerHTML = `<span class="text-xs text-slate-500 text-center px-2">Vào qua mã: <strong>${roomCode}</strong></span>`;
+                container.innerHTML = `<span class="text-xs text-slate-500 text-center px-2">Vào qua mã PIN: <strong>${roomCode}</strong></span>`;
             }
 
             const localHint = document.getElementById('host-qr-local-hint');
@@ -1548,8 +1671,15 @@
             }
         }
 
+        window.updateCustomQRUrl = () => {
+            if (currentRoomCode) {
+                renderQRCode(currentRoomCode);
+                showToast("Đã cập nhật mã QR theo URL mới!", "success");
+            }
+        };
+
         function hostBroadcastPlayerList() {
-            const playersList = Array.from(roomPlayers.values());
+            const playersList = Array.from(roomPlayers.values()).filter(p => !p.id.startsWith('host_'));
             sendNetworkMessage('LOBBY_SYNC', {
                 roomCode: currentRoomCode,
                 questionCount: activeQuestions.length,
@@ -1562,32 +1692,68 @@
             if (action === 'PLAYER_JOIN') {
                 const p = packet.player;
                 if (!p || !p.id) return;
+                const isNew = !roomPlayers.has(p.id);
+                const existing = roomPlayers.get(p.id) || {};
+
                 roomPlayers.set(p.id, {
                     id: p.id,
                     name: p.name || 'Thí sinh',
                     avatar: p.avatar || '🦊',
-                    score: 0,
-                    correctCount: 0,
-                    streak: 0,
-                    bestStreak: 0,
-                    answered: false,
-                    lastChoice: -1,
-                    timeUsed: 0
+                    score: existing.score || 0,
+                    correctCount: existing.correctCount || 0,
+                    streak: existing.streak || 0,
+                    bestStreak: existing.bestStreak || 0,
+                    answered: existing.answered || false,
+                    lastChoice: existing.lastChoice !== undefined ? existing.lastChoice : -1,
+                    timeUsed: existing.timeUsed || 0
                 });
 
-                sound.playTone(880, 'triangle', 0.1, 0.08);
-                showToast(`${p.avatar || '🦊'} ${p.name} vừa vào phòng!`, 'info');
+                if (isNew) {
+                    sound.playTone(880, 'triangle', 0.1, 0.08);
+                    showToast(`${p.avatar || '🦊'} ${p.name} vừa vào phòng!`, 'info');
+                }
                 updateHostPlayerUI();
 
-                // Phát đồng bộ danh sách người chơi mới nhất cho toàn phòng
+                // Ngay lập tức gửi LOBBY_SYNC để xác nhận (Ack) và cập nhật danh sách cho thí sinh
                 hostBroadcastPlayerList();
+
+                // Nếu đang trong trận đấu mà thí sinh kết nối lại, gửi lại câu hỏi hiện tại
+                if (isQuestionActive && activeQuestions[currentQIndex]) {
+                    const qObj = activeQuestions[currentQIndex];
+                    sendNetworkMessage('QUESTION_START', {
+                        qIndex: currentQIndex,
+                        totalQuestions: activeQuestions.length,
+                        question: {
+                            q: qObj.q,
+                            options: qObj.options
+                        },
+                        duration: questionDuration,
+                        serverStartTime: Date.now()
+                    });
+                }
             } else if (action === 'PLAYER_ANSWER') {
                 if (!isQuestionActive) return;
                 const { playerId, qIndex, choice, timeUsed } = packet;
                 if (qIndex !== currentQIndex) return;
 
-                const player = roomPlayers.get(playerId);
-                if (player && !player.answered) {
+                let player = roomPlayers.get(playerId);
+                if (!player) {
+                    player = {
+                        id: playerId,
+                        name: packet.playerName || 'Thí sinh',
+                        avatar: packet.playerAvatar || '🦊',
+                        score: 0,
+                        correctCount: 0,
+                        streak: 0,
+                        bestStreak: 0,
+                        answered: false,
+                        lastChoice: -1,
+                        timeUsed: 0
+                    };
+                    roomPlayers.set(playerId, player);
+                }
+
+                if (!player.answered) {
                     player.answered = true;
                     player.lastChoice = choice;
                     player.timeUsed = timeUsed;
@@ -1662,6 +1828,10 @@
         };
 
         window.hostTriggerStartGame = () => {
+            if (hostLobbyInterval) {
+                clearInterval(hostLobbyInterval);
+                hostLobbyInterval = null;
+            }
             const selectDur = document.getElementById('host-select-duration');
             if (selectDur) questionDuration = parseInt(selectDur.value, 10) || 15;
 
@@ -1853,7 +2023,8 @@
         // ============================================================================
         function playerJoinRoom(roomCode, playerName, avatar) {
             currentRole = 'player';
-            currentRoomCode = roomCode.trim().toUpperCase();
+            currentRoomCode = normalizeRoomPin(roomCode);
+            hasReceivedHostAck = false;
             myProfile.name = playerName || 'Thí Sinh';
             myProfile.avatar = avatar || AVATARS[0];
             myProfile.score = 0;
@@ -1877,30 +2048,59 @@
             document.getElementById('player-my-name').textContent = myProfile.name;
             document.getElementById('player-joined-room-code').textContent = currentRoomCode;
 
+            updatePlayerConnectionStatus(false);
+
             window.switchMainTab('arena');
             showArenaScreen('screen-player-lobby');
 
-            // Gửi thông điệp tham gia cho Host
-            sendNetworkMessage('PLAYER_JOIN', {
-                player: {
-                    id: myProfile.id,
-                    name: myProfile.name,
-                    avatar: myProfile.avatar
-                }
-            });
+            // Gửi gói tin tham gia phòng ngay lập tức (sẽ tự lưu outbox nếu chưa kết nối xong)
+            sendPlayerJoinPacket();
 
-            showToast(`Đã kết nối vào phòng ${currentRoomCode}!`, 'success');
+            // Nhịp tim định kỳ: gửi lại tín hiệu tìm phòng mỗi 1.5s cho đến khi Quản trò xác nhận
+            if (playerLobbyInterval) clearInterval(playerLobbyInterval);
+            let retryCount = 0;
+            playerLobbyInterval = setInterval(() => {
+                const playerLobby = document.getElementById('screen-player-lobby');
+                if (playerLobby && !playerLobby.classList.contains('hidden') && currentRole === 'player') {
+                    retryCount++;
+                    if (!hasReceivedHostAck) {
+                        sendPlayerJoinPacket();
+                        if (retryCount >= 6) {
+                            const descEl = document.getElementById('player-waiting-desc');
+                            if (descEl) {
+                                descEl.innerHTML = `<span class="text-amber-300 font-semibold">Chưa thấy Quản Trò phản hồi.</span> Hãy kiểm tra Quản Trò đã mở phòng <strong>${currentRoomCode}</strong> chưa!`;
+                            }
+                        }
+                    } else {
+                        // Đã vào phòng thành công, gửi keepalive giãn cách
+                        if (retryCount % 3 === 0) {
+                            sendPlayerJoinPacket();
+                        }
+                    }
+                } else {
+                    clearInterval(playerLobbyInterval);
+                    playerLobbyInterval = null;
+                }
+            }, 1500);
+
+            showToast(`Đang kết nối vào phòng ${currentRoomCode}...`, 'info');
             sound.playTone(700, 'sine', 0.12, 0.12);
         }
 
         function handlePlayerIncomingMessage(action, packet) {
             if (action === 'LOBBY_SYNC') {
+                hasReceivedHostAck = true;
+                updatePlayerConnectionStatus(true);
                 if (packet.playersList && Array.isArray(packet.playersList)) {
                     roomPlayers.clear();
                     packet.playersList.forEach(p => roomPlayers.set(p.id, p));
                     updatePlayerLobbyPeersUI();
                 }
             } else if (action === 'COUNTDOWN_START') {
+                if (playerLobbyInterval) {
+                    clearInterval(playerLobbyInterval);
+                    playerLobbyInterval = null;
+                }
                 window.switchMainTab('arena');
                 if (!sound.bgmPlaying) sound.startBGM();
                 startSynchronizedCountdownUI(packet.count || 3, null);
@@ -1950,7 +2150,6 @@
                 renderRevealScreenUI(currentQuestion, correctIndex, tally, myDelta);
             } else if (action === 'LEADERBOARD_SHOW') {
                 window.switchMainTab('arena');
-                // Đồng bộ danh sách người chơi
                 if (packet.allPlayers && Array.isArray(packet.allPlayers)) {
                     roomPlayers.clear();
                     packet.allPlayers.forEach(p => roomPlayers.set(p.id, p));
@@ -2014,10 +2213,12 @@
 
             sound.playTone(550, 'triangle', 0.1, 0.1);
 
-            // Gửi đáp án cho Host
+            // Gửi đáp án cho Host (kèm thông tin nhận diện)
             if (currentRole === 'player') {
                 sendNetworkMessage('PLAYER_ANSWER', {
                     playerId: myProfile.id,
+                    playerName: myProfile.name,
+                    playerAvatar: myProfile.avatar,
                     qIndex: currentQIndex,
                     choice: chosenIndex,
                     timeUsed: elapsed
@@ -2646,14 +2847,14 @@
         // ============================================================================
         window.openCreateRoomModal = () => {
             sound.initContext();
-            document.getElementById('input-custom-pin').value = 'ARENA-' + Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('input-custom-pin').value = String(Math.floor(100000 + Math.random() * 900000));
             document.getElementById('modal-create-room').classList.remove('hidden');
         };
 
         window.openJoinRoomModal = (presetPin = '') => {
             sound.initContext();
             renderModalAvatarSelector();
-            if (presetPin) document.getElementById('input-join-pin').value = presetPin;
+            if (presetPin) document.getElementById('input-join-pin').value = normalizeRoomPin(presetPin);
             document.getElementById('modal-join-room').classList.remove('hidden');
         };
 
@@ -2691,7 +2892,7 @@
 
         window.confirmJoinRoom = () => {
             const name = document.getElementById('input-player-name').value.trim();
-            const pin = document.getElementById('input-join-pin').value.trim();
+            let pin = document.getElementById('input-join-pin').value.trim();
 
             if (!name) {
                 showToast("Vui lòng nhập Tên hiển thị của bạn!", "warning");
@@ -2704,16 +2905,27 @@
                 return;
             }
 
+            pin = normalizeRoomPin(pin);
             window.closeModal('modal-join-room');
             playerJoinRoom(pin, name, selectedAvatar);
         };
 
         window.copyRoomLink = () => {
-            const url = `${window.location.origin}${window.location.pathname}?room=${currentRoomCode}`;
+            let url = `${window.location.origin}${window.location.pathname}?room=${currentRoomCode}`;
+            if (window.location.protocol === 'file:') {
+                const customInput = document.getElementById('input-custom-qr-url');
+                if (customInput && customInput.value.trim()) {
+                    let customVal = customInput.value.trim();
+                    if (!customVal.includes('?room=')) {
+                        customVal += (customVal.includes('?') ? '&' : '?') + 'room=' + currentRoomCode;
+                    }
+                    url = customVal;
+                }
+            }
             navigator.clipboard.writeText(url).then(() => {
                 showToast(`Đã sao chép liên kết phòng: ${url}`, "success");
             }).catch(() => {
-                showToast(`Mã phòng: ${currentRoomCode}`, "info");
+                showToast(`Mã phòng PIN: ${currentRoomCode}`, "info");
             });
         };
 
@@ -2722,8 +2934,27 @@
                 if (currentRole === 'player') {
                     sendNetworkMessage('PLAYER_LEAVE', { playerId: myProfile.id });
                 }
+                if (playerLobbyInterval) {
+                    clearInterval(playerLobbyInterval);
+                    playerLobbyInterval = null;
+                }
+                if (hostLobbyInterval) {
+                    clearInterval(hostLobbyInterval);
+                    hostLobbyInterval = null;
+                }
+                if (mqttClient) {
+                    try { mqttClient.end(true); } catch (e) {}
+                    mqttClient = null;
+                }
+                if (broadcastChan) {
+                    try { broadcastChan.close(); } catch (e) {}
+                    broadcastChan = null;
+                }
                 currentRole = 'none';
                 currentRoomCode = '';
+                isConnectedToCloud = false;
+                hasReceivedHostAck = false;
+                outboxQueue.length = 0;
                 isQuestionActive = false;
                 if (questionTimerInterval) clearInterval(questionTimerInterval);
                 document.getElementById('room-status-bar').classList.add('hidden');
@@ -2732,6 +2963,21 @@
                 showToast("Đã rời phòng thi đấu.", "info");
             }
         };
+
+        // Tự động kiểm tra kết nối lại khi điện thoại mở sáng màn hình hoặc chuyển tab trở lại
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && currentRoomCode && currentRole !== 'none' && currentRole !== 'solo') {
+                if (!isConnectedToCloud || (mqttClient && mqttClient.disconnected)) {
+                    console.log("Màn hình sáng trở lại: Kết nối lại mạng Cloud...");
+                    initRealtimeNetwork(currentRoomCode, activeBrokerIdx);
+                }
+                if (currentRole === 'player') {
+                    sendPlayerJoinPacket();
+                } else if (currentRole === 'host') {
+                    hostBroadcastPlayerList();
+                }
+            }
+        });
 
         window.navGoHome = () => {
             window.switchMainTab('arena');
